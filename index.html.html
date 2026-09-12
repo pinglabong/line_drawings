@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#191D21">
+<title>Line Lab</title>
+<style>
+:root{
+  --paper:#E6E7E1;
+  --paper-edge:#D3D5CC;
+  --graphite:#20242A;
+  --target:#9AA096;
+  --guide:#C3C6BC;
+  --machine:#0E7490;
+  --machine-soft:rgba(14,116,144,.16);
+  --alert:#A82F1B;
+  --alert-soft:rgba(168,47,27,.14);
+  --ok:#2F7D4F;
+  --warn:#9C6B12;
+  --chrome:#191D21;
+  --panel:#232A30;
+  --panel-2:#2C343B;
+  --line:#39424A;
+  --text:#DDE1DA;
+  --dim:#8B948E;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Helvetica Neue","Noto Sans Thai",sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  background:var(--chrome);color:var(--text);font-family:var(--sans);
+  font-size:15px;line-height:1.45}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+
+/* ---------- shell ---------- */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+
+#bar{flex:0 0 auto;height:46px;display:flex;align-items:center;gap:4px;
+  padding:0 10px;background:var(--chrome);border-bottom:1px solid var(--line)}
+#bar .modes{display:flex;gap:2px;background:var(--panel);border-radius:8px;padding:2px}
+#bar .modes button{padding:5px 11px;border-radius:6px;font-size:13.5px;color:var(--dim)}
+#bar .modes button.on{background:var(--panel-2);color:var(--text)}
+#bar .spacer{flex:1}
+#counter{font-family:var(--mono);font-size:13px;color:var(--dim);letter-spacing:.02em}
+#counter b{color:var(--text);font-weight:600}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;
+  color:var(--dim);font-size:17px}
+.iconbtn:active{background:var(--panel)}
+
+#blockname{font-size:14px;font-weight:600;padding-left:4px}
+#progwrap{flex:0 0 auto;height:2px;background:var(--line)}
+#prog{height:100%;width:0;background:var(--machine);transition:width .6s linear}
+#gate{position:absolute;inset:0;z-index:5;display:grid;place-items:center;
+  background:rgba(230,231,225,.97);padding:0 34px;text-align:center}
+#gate[hidden]{display:none}
+#gate h3{margin:0 0 8px;font-size:24px;font-weight:600;color:#20242A;letter-spacing:-.02em}
+#gate p{margin:0 0 18px;font-size:15px;color:#5D6459;line-height:1.55;max-width:22em}
+#gate span{font-size:12.5px;color:#8A9086}
+
+#stage{flex:1 1 auto;position:relative;background:var(--paper);overflow:hidden}
+#pad{position:absolute;inset:0;touch-action:none;display:block}
+#hint{position:absolute;left:0;right:0;top:14px;text-align:center;pointer-events:none;
+  font-size:13.5px;color:#7E857B;transition:opacity .25s}
+
+#strip{flex:0 0 auto;min-height:54px;display:flex;align-items:stretch;
+  background:var(--chrome);border-top:1px solid var(--line)}
+#strip .cell{flex:1;display:flex;flex-direction:column;justify-content:center;
+  align-items:center;gap:1px;border-right:1px solid var(--line);padding:6px 2px}
+#strip .cell:last-child{border-right:none}
+#strip .k{font-size:10.5px;color:var(--dim)}
+#strip .v{font-family:var(--mono);font-size:17px;font-weight:600;letter-spacing:-.01em}
+#strip .v.ok{color:#5FCF92}
+#strip .v.warn{color:#E0AC42}
+#strip .v.bad{color:#EF7256}
+#strip.empty .v{color:var(--line)}
+
+/* ---------- overlays ---------- */
+.sheet{position:absolute;inset:0;background:var(--chrome);z-index:20;
+  display:flex;flex-direction:column;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.sheet[hidden]{display:none}
+.sheet header{flex:0 0 auto;height:50px;display:flex;align-items:center;gap:10px;
+  padding:0 14px;border-bottom:1px solid var(--line)}
+.sheet header h2{margin:0;font-size:16px;font-weight:600;flex:1}
+.sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:16px 14px 40px;max-width:760px;width:100%;margin:0 auto}
+
+/* ---------- home ---------- */
+#home .body{padding-top:26px}
+.brandline{display:flex;align-items:baseline;gap:10px;margin-bottom:3px}
+.brandline h1{margin:0;font-size:30px;font-weight:600;letter-spacing:-.02em}
+.brandline span{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.lede{color:var(--dim);font-size:14px;margin:0 0 22px;max-width:46em}
+.run{display:block;width:100%;text-align:left;background:var(--machine);
+  border-radius:12px;padding:16px 18px;margin-bottom:4px}
+.run:active{opacity:.85}
+.run strong{display:block;font-size:19px;font-weight:600;color:#fff;letter-spacing:-.01em}
+.run em{font-style:normal;font-size:13px;color:rgba(255,255,255,.78)}
+.pick{display:flex;flex-direction:column;gap:9px;margin-bottom:22px}
+.pick button{display:flex;align-items:center;gap:14px;text-align:left;
+  background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+.pick button:active{background:var(--panel-2)}
+.pick .glyph{flex:0 0 46px;height:38px}
+.pick .t{flex:1}
+.pick .t strong{display:block;font-weight:600;font-size:15px}
+.pick .t em{font-style:normal;color:var(--dim);font-size:12.5px}
+.pick .n{font-family:var(--mono);font-size:12px;color:var(--dim)}
+
+.sub{font-size:12.5px;color:var(--dim);margin:26px 0 9px;
+  padding-bottom:6px;border-bottom:1px solid var(--line)}
+.hist{display:flex;flex-direction:column;gap:1px}
+.hist .row{display:flex;align-items:center;gap:12px;padding:9px 2px;font-size:13px}
+.hist .row+.row{border-top:1px solid var(--line)}
+.hist .d{flex:1;color:var(--dim);font-size:12.5px}
+.hist .m{font-family:var(--mono);font-size:13px;width:52px;text-align:right}
+.empty-note{color:var(--dim);font-size:13px;padding:14px 0}
+
+/* ---------- report ---------- */
+.verdict{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:15px 16px;margin-bottom:16px}
+.verdict h3{margin:0 0 6px;font-size:17px;font-weight:600}
+.verdict p{margin:0;font-size:13.5px;color:var(--dim)}
+.verdict.bad{border-color:#5A3026}
+.verdict.good{border-color:#2C5A42}
+
+.gauges{display:flex;flex-direction:column;gap:0;margin-bottom:22px;
+  border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.g{display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--panel)}
+.g+.g{border-top:1px solid var(--line)}
+.g .lab{flex:0 0 112px;font-size:13px;line-height:1.3}
+.g .lab em{display:block;font-style:normal;font-size:10.5px;color:var(--dim);margin-top:1px}
+.g .track{flex:1;height:5px;border-radius:3px;background:var(--panel-2);position:relative;overflow:hidden}
+.g .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.g .num{flex:0 0 62px;text-align:right;font-family:var(--mono);font-size:14px;font-weight:600}
+
+.srcnote{font-size:12px;color:var(--dim);margin:-8px 0 16px;line-height:1.5}
+.volume{display:flex;gap:0;border:1px solid var(--line);border-radius:11px;
+  overflow:hidden;margin-bottom:22px}
+.volume div{flex:1;padding:11px 13px;background:var(--panel);border-right:1px solid var(--line)}
+.volume div:last-child{border-right:none}
+.volume span{display:block;font-size:10.5px;color:var(--dim)}
+.volume b{font-family:var(--mono);font-size:16px;font-weight:600}
+h4.plot-t{margin:0 0 3px;font-size:14px;font-weight:600}
+p.plot-d{margin:0 0 10px;font-size:12.5px;color:var(--dim);max-width:44em}
+.plotbox{background:#12161A;border:1px solid var(--line);border-radius:11px;
+  padding:12px 10px 8px;margin-bottom:22px}
+.plotbox canvas{display:block;width:100%}
+.legend{display:flex;gap:16px;padding:8px 4px 0;font-size:11.5px;color:var(--dim)}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+
+.twocol{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.twocol>*{flex:1 1 240px;margin-bottom:0}
+
+table.strokes{width:100%;border-collapse:collapse;font-size:13px}
+table.strokes th{text-align:right;font-weight:500;font-size:11px;color:var(--dim);
+  padding:0 5px 7px;border-bottom:1px solid var(--line)}
+table.strokes th:first-child{text-align:left}
+table.strokes td{padding:8px 5px;text-align:right;font-family:var(--mono);font-size:13px;
+  border-bottom:1px solid #22282D}
+table.strokes td:first-child{text-align:left;color:var(--dim)}
+table.strokes tr:active td{background:var(--panel)}
+td.flag{color:#EF7256}
+td.fine{color:var(--dim)}
+
+.stop{border:1px solid #2C5A42;border-radius:12px;padding:14px 16px;margin-top:26px;background:var(--panel)}
+.stop h4{margin:0 0 5px;font-size:15px;font-weight:600}
+.stop p{margin:0;font-size:13px;color:var(--dim);line-height:1.6}
+.actions{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+.actions button{flex:1 1 130px;padding:12px;border-radius:10px;background:var(--panel);
+  border:1px solid var(--line);font-size:14px;text-align:center}
+.actions button.primary{background:var(--machine);border-color:var(--machine);color:#fff;font-weight:600}
+.actions button:active{opacity:.75}
+
+#inspect .body{display:flex;flex-direction:column;gap:14px}
+#inspect .plotbox{margin-bottom:0}
+.readout{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.readout div{flex:1 1 33.33%;padding:9px 11px;background:var(--panel);
+  border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.readout span{display:block;font-size:10.5px;color:var(--dim)}
+.readout b{font-family:var(--mono);font-size:15px;font-weight:600}
+
+.note{font-size:12px;color:var(--dim);line-height:1.6;margin-top:18px;
+  padding-top:14px;border-top:1px solid var(--line)}
+.note code{font-family:var(--mono);font-size:11px;background:var(--panel);padding:1px 4px;border-radius:3px}
+#storemode{font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <button class="iconbtn" id="quit">‹</button>
+    <div class="modes" id="modes"></div>
+    <div id="blockname" hidden></div>
+    <div class="spacer"></div>
+    <div id="counter"></div>
+    <button class="iconbtn" id="skip" title="ข้ามเป้านี้">⤳</button>
+  </div>
+  <div id="progwrap" hidden><div id="prog"></div></div>
+  <div id="stage">
+    <canvas id="pad"></canvas>
+    <div id="hint"></div>
+    <div id="gate" hidden></div>
+  </div>
+  <div id="strip" class="empty"></div>
+</div>
+
+<!-- HOME -->
+<section class="sheet" id="home">
+  <div class="body">
+    <div class="brandline">
+      <h1>Line Lab</h1><span id="storemode"></span>
+    </div>
+    <p class="lede" style="margin-bottom:16px">วัดคุณภาพเส้นจากการเคลื่อนไหวจริง ไม่ใช่จากรูปที่ได้ — เก็บ x, y, เวลา, แรงกด ทุกจุดตอนลาก แล้วแยกให้ดูว่าปัญหาอยู่ที่การโก่ง การสั่น หรือการเบรกท้ายเส้น</p>
+
+    <button class="run" id="runBtn">
+      <strong>ฝึก 30 นาที</strong>
+      <em>วอร์ม → วัดผล → ฝึกเส้น → ฝึกเพลน แล้วหยุดเอง</em>
+    </button>
+
+    <div class="sub">ซ้อมเดี่ยว</div>
+    <div class="pick" id="pick"></div>
+
+    <div class="sub">ผลย้อนหลัง · ◆ มีบล็อกวัดผล</div>
+    <div class="hist" id="hist"></div>
+
+    <div class="actions">
+      <button id="exportBtn">ดาวน์โหลดข้อมูล JSON</button>
+      <button id="importBtn">นำเข้าไฟล์</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" hidden>
+
+    <p class="note">
+      วางไอแพดราบบนโต๊ะ อย่าวางข้อศอกพัก แล้วลากจากไหล่<br>
+      แอปรับเฉพาะ Apple&nbsp;Pencil เมื่อตรวจพบปากกา นิ้วจะถูกกันออกอัตโนมัติ<br>
+      SPARC (Balasubramanian et&nbsp;al.) เก็บไว้ในข้อมูลและดูได้รายเส้น แต่ไม่นับรวมคะแนน — มันออกแบบมาสำหรับการเอื้อมที่จบสมบูรณ์ ไม่ใช่เส้นที่ถูกตัดจบด้วยการยกปากกา
+    </p>
+  </div>
+</section>
+
+<!-- REPORT -->
+<section class="sheet" id="report" hidden>
+  <header>
+    <button class="iconbtn" id="reportBack">‹</button>
+    <h2 id="reportTitle">สรุปรอบนี้</h2>
+  </header>
+  <div class="body" id="reportBody"></div>
+</section>
+
+<!-- INSPECT -->
+<section class="sheet" id="inspect" hidden>
+  <header>
+    <button class="iconbtn" id="inspectBack">‹</button>
+    <h2 id="inspectTitle">เส้นที่ 1</h2>
+  </header>
+  <div class="body" id="inspectBody"></div>
+</section>
+
+<script>
+"use strict";
+/* =====================================================================
+   0. storage adapter
+   ===================================================================== */
+const Store = (() => {
+  let mode = "memory", mem = {};
+  const KEY = "linelab:sessions";
+  async function detect(){
+    if (typeof window.storage === "object" && window.storage && window.storage.get){
+      try { await window.storage.list("linelab:"); mode = "synced"; return; } catch(e){}
+      mode = "synced"; return;
+    }
+    try {
+      window.localStorage.setItem("linelab:probe","1");
+      window.localStorage.removeItem("linelab:probe");
+      mode = "local"; return;
+    } catch(e){}
+    mode = "memory";
+  }
+  async function load(){
+    try{
+      if (mode === "synced"){
+        const r = await window.storage.get(KEY);
+        return r && r.value ? JSON.parse(r.value) : [];
+      }
+      if (mode === "local"){
+        const v = window.localStorage.getItem(KEY);
+        return v ? JSON.parse(v) : [];
+      }
+      return mem[KEY] || [];
+    }catch(e){ return mem[KEY] || []; }
+  }
+  async function save(list){
+    const s = JSON.stringify(list);
+    mem[KEY] = list;
+    try{
+      if (mode === "synced") await window.storage.set(KEY, s);
+      else if (mode === "local") window.localStorage.setItem(KEY, s);
+    }catch(e){ mode = "memory"; }
+  }
+  return { detect, load, save, label: () => mode };
+})();
+
+/* =====================================================================
+   1. geometry + metrics
+   ===================================================================== */
+const V = {
+  sub:(a,b)=>({x:a.x-b.x,y:a.y-b.y}),
+  len:(a)=>Math.hypot(a.x,a.y),
+  dist:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),
+  unit:(a)=>{const l=Math.hypot(a.x,a.y)||1;return {x:a.x/l,y:a.y/l};},
+  dot:(a,b)=>a.x*b.x+a.y*b.y,
+  norm:(u)=>({x:-u.y,y:u.x})            // right-hand side of travel, screen coords
+};
+
+// least-squares polynomial fit, returns [c0, c1, ...] for c0 + c1*x + c2*x^2
+function polyfit(xs, ys, deg){
+  const n = deg+1, A = [], b = [];
+  for (let r=0;r<n;r++){
+    A.push(new Array(n).fill(0)); b.push(0);
+    for (let k=0;k<xs.length;k++){
+      for (let c=0;c<n;c++) A[r][c] += Math.pow(xs[k], r+c);
+      b[r] += ys[k]*Math.pow(xs[k], r);
+    }
+  }
+  for (let i=0;i<n;i++){                       // gaussian elimination
+    let p=i; for(let r=i+1;r<n;r++) if (Math.abs(A[r][i])>Math.abs(A[p][i])) p=r;
+    [A[i],A[p]]=[A[p],A[i]]; [b[i],b[p]]=[b[p],b[i]];
+    if (Math.abs(A[i][i])<1e-12) return new Array(n).fill(0);
+    for (let r=0;r<n;r++){
+      if (r===i) continue;
+      const f = A[r][i]/A[i][i];
+      for (let c=i;c<n;c++) A[r][c] -= f*A[i][c];
+      b[r] -= f*b[i];
+    }
+  }
+  return b.map((v,i)=>v/A[i][i]);
+}
+function poly(c,x){ let v=0; for(let i=c.length-1;i>=0;i--) v = v*x + c[i]; return v; }
+
+// cumulative arc length
+function arcLengths(pts){
+  const s=[0];
+  for(let i=1;i<pts.length;i++) s.push(s[i-1]+V.dist(pts[i],pts[i-1]));
+  return s;
+}
+// resample a scalar series defined at arc positions s onto n equal-arc samples
+function resampleByArc(s, vals, n){
+  const total = s[s.length-1] || 1, out=[];
+  let j=0;
+  for(let k=0;k<n;k++){
+    const target = total*k/(n-1);
+    while(j<s.length-2 && s[j+1]<target) j++;
+    const span = (s[j+1]-s[j])||1;
+    const t = Math.max(0,Math.min(1,(target-s[j])/span));
+    out.push(vals[j]+(vals[j+1]-vals[j])*t);
+  }
+  return out;
+}
+
+// SPARC — spectral arc length (Balasubramanian et al.)
+function sparc(speeds, fs, fc=10, ampTh=0.05, padLevel=4){
+  const n = speeds.length;
+  if (n < 12 || !isFinite(fs) || fs <= 0) return null;
+  const nfft = Math.pow(2, Math.ceil(Math.log2(n)) + padLevel);
+  const maxBin = Math.min(nfft-1, Math.floor(fc*nfft/fs));
+  if (maxBin < 4) return null;
+  const mag=[];
+  for(let k=0;k<=maxBin;k++){
+    let re=0, im=0;
+    for(let i=0;i<n;i++){
+      const a = -2*Math.PI*k*i/nfft;
+      re += speeds[i]*Math.cos(a);
+      im += speeds[i]*Math.sin(a);
+    }
+    mag.push(Math.hypot(re,im));
+  }
+  const mx = Math.max.apply(null, mag) || 1;
+  const M = mag.map(v=>v/mx);
+  let last = 0;
+  for(let k=0;k<=maxBin;k++) if (M[k] >= ampTh) last = k;
+  if (last < 3) return null;
+  const df = fs/nfft, fSpan = (last*df) || 1;
+  let sal = 0;
+  for(let k=1;k<=last;k++){
+    const dfN = df/fSpan, dM = M[k]-M[k-1];
+    sal -= Math.hypot(dfN, dM);
+  }
+  return sal;
+}
+
+/**
+ * Full analysis of a single stroke against its intended target.
+ * pts: [{x,y,t,p}]   A,B: target endpoints (may be null for freeform)
+ */
+function analyze(pts, A, B){
+  if (pts.length < 4) return null;
+  const S = pts[0], E = pts[pts.length-1];
+  const chordVec = V.sub(E,S), chord = V.len(chordVec);
+  if (chord < 12) return null;
+  const u = V.unit(chordVec), nrm = V.norm(u);
+
+  const s = arcLengths(pts);
+  const path = s[s.length-1];
+
+  // perpendicular deviation from the stroke's own chord
+  const dev = pts.map(p => V.dot(V.sub(p,S), nrm));
+
+  // Work on the body only (terminal 10% each end belongs to the hook metrics),
+  // with position renormalised to [0,1] across that body.
+  const bi = [];
+  for (let i=0;i<pts.length;i++) if (s[i]>=path*0.10 && s[i]<=path*0.90) bi.push(i);
+  const s0 = s[bi[0]], s1 = s[bi[bi.length-1]], sSpan = (s1-s0)||1;
+  const bs = bi.map(i => (s[i]-s0)/sSpan);
+  const bd = bi.map(i => dev[i]);
+
+  // Decompose the body into: a straight tilt, a smooth arc, and the rest (wobble).
+  // Fitting rather than averaging is what makes this immune to a hook at either
+  // end tilting the start-to-end chord.
+  const quad = polyfit(bs, bd, 2);
+  const sagitta = -0.25 * quad[2];                 // arc height at the midpoint
+  const resid = bd.map((d,k)=> d - poly(quad, bs[k]));
+  const rms = Math.sqrt(resid.reduce((a,b)=>a+b*b,0)/resid.length);
+  // departure measured from the line joining the body's own endpoints, so the
+  // headline number stays on the same scale as the bow it decomposes into
+  const e0 = bd[0], e1 = bd[bd.length-1];
+  const offStraight = bd.map((d,k)=> Math.abs(d - (e0 + (e1-e0)*bs[k])));
+
+  const straightness = Math.max.apply(null, offStraight)/chord*100;  // total departure
+  const bow          = sagitta/chord*100;                            // smooth arc, signed
+  const wobbleAmp    = rms/chord*100;                                // jitter after the arc
+  const bowRatio     = (Math.abs(sagitta)+rms) ? Math.abs(sagitta)/(Math.abs(sagitta)+rms) : 0;
+  const ioc          = path/chord;
+
+  // reversals counted on the residual, so a clean arc scores zero
+  const R = 48;
+  const devR  = resampleByArc(s, dev, R);
+  const residR = resampleByArc(bs.map(v=>v*sSpan+s0), resid, R);
+  const thresh = chord*0.004;
+  let reversals = 0, dir = 0, anchor = residR[0];
+  for(let i=1;i<R;i++){
+    const d = residR[i]-anchor;
+    if (Math.abs(d) < thresh) continue;
+    const nd = Math.sign(d);
+    if (dir !== 0 && nd !== dir) reversals++;
+    dir = nd; anchor = residR[i];
+  }
+
+  // hooks: terminal tangent vs the tangent just before it, so a steady arc
+  // does not register as a hook and vice versa
+  function tangent(f0,f1){
+    const a = pointAtArc(pts,s,path*f0), b = pointAtArc(pts,s,path*f1);
+    return V.unit(V.sub(b,a));
+  }
+  function turn(v1,v2){
+    return Math.atan2(v1.x*v2.y-v1.y*v2.x, V.dot(v1,v2))*180/Math.PI;
+  }
+  const hookEnd   = turn(tangent(0.74,0.88), tangent(0.88,1.00));
+  const hookStart = turn(tangent(0.12,0.26), tangent(0.00,0.12));
+
+  // speed profile
+  const spd=[0];
+  for(let i=1;i<pts.length;i++){
+    const dt = Math.max(pts[i].t-pts[i-1].t, 1e-3);
+    spd.push(V.dist(pts[i],pts[i-1])/dt*1000);   // px/s
+  }
+  spd[0] = spd[1]||0;
+  // 3-point median filter: one bad timestamp must not define the peak
+  const spdF = spd.map((v,i)=>{
+    if (i===0 || i===spd.length-1) return v;
+    return [spd[i-1],spd[i],spd[i+1]].sort((a,b)=>a-b)[1];
+  });
+  const spdR = resampleByArc(s, spdF, R);
+  const avg = a => a.reduce((x,y)=>x+y,0)/(a.length||1);
+  const mid = spdR.slice(Math.floor(R*0.2), Math.floor(R*0.8));
+  const midAvg = avg(mid);
+  const srt = [...spdR].sort((a,b)=>a-b);
+  const peak = srt[Math.floor(srt.length*0.95)] || 1;   // robust peak, not the max
+  // speed still present when the pen leaves the surface, as a share of peak.
+  // Confident strokes lift while still moving; braked strokes have stopped.
+  const tail = spdR.slice(Math.floor(R*0.92)).sort((a,b)=>a-b);
+  const liftSpeed = tail[Math.floor(tail.length/2)] / peak;
+  // where the slowdown begins: last point still above half peak
+  let decelOnset = 1;
+  for(let k=R-1;k>=1;k--){ if (spdR[k] >= peak*0.5){ decelOnset = k/(R-1); break; } }
+  const sd = Math.sqrt(avg(mid.map(v=>(v-midAvg)**2)));
+  const speedCoV = midAvg ? sd/midAvg*100 : 0;
+
+  // SPARC on a uniform-time speed series
+  const dur = pts[pts.length-1].t - pts[0].t;
+  const fs = dur>0 ? (pts.length-1)/(dur/1000) : 0;
+  const sparcVal = sparc(spdF.slice(1), fs);
+
+  // accuracy vs target
+  let startErr=null, endErr=null, overshoot=null;
+  if (A && B){
+    const tu = V.unit(V.sub(B,A));
+    startErr = V.dist(S,A);
+    endErr   = V.dist(E,B);
+    overshoot = V.dot(V.sub(E,B), tu);
+  }
+
+  return {
+    chord, path, ioc, straightness, bow, wobbleAmp, bowRatio, reversals,
+    hookEnd, hookStart, liftSpeed, decelOnset, speedCoV, sparc: sparcVal,
+    meanSpeed: midAvg, duration: dur,
+    startErr, endErr, overshoot,
+    angle: (Math.atan2(u.y,u.x)*180/Math.PI+360)%360,
+    devProfile: devR.map(d=>d/chord*100),
+    speedProfile: spdR
+  };
+}
+function pointAtArc(pts,s,target){
+  let j=0;
+  while(j<s.length-2 && s[j+1]<target) j++;
+  const span=(s[j+1]-s[j])||1, t=Math.max(0,Math.min(1,(target-s[j])/span));
+  return {x:pts[j].x+(pts[j+1].x-pts[j].x)*t, y:pts[j].y+(pts[j+1].y-pts[j].y)*t};
+}
+
+/* =====================================================================
+   2. scoring — confidence weighted far above accuracy (Drawabox stage 1)
+   ===================================================================== */
+const BANDS = {
+  straightness:{good:0.8, bad:2.5},
+  bow:         {good:0.6, bad:2.5},
+  hook:        {good:4,   bad:14},
+  reversals:   {good:2,   bad:6},
+  lift:        {good:0.45,bad:0.12, invert:true},
+  accuracy:    {good:0.02,bad:0.08}
+};
+function grade(v, b){
+  if (v==null) return .5;
+  const t = b.invert ? (v-b.bad)/(b.good-b.bad) : (b.bad-v)/(b.bad-b.good);
+  return Math.max(0, Math.min(1, t));
+}
+function gradeColor(g){ return g>=.66 ? "var(--ok)" : g>=.33 ? "var(--warn)" : "var(--alert)"; }
+function gradeClass(g){ return g>=.66 ? "ok" : g>=.33 ? "warn" : "bad"; }
+
+/* =====================================================================
+   3. exercises
+   ===================================================================== */
+// CSS px per mm — the benchmark is specified in physical size so the number
+// stays comparable across orientations and devices
+const MM = 3.7795, BENCH_MM = 120;
+// fixed benchmark directions, interleaved so consecutive strokes aren't neighbours
+const BENCH_ANGLES = [0,135,270,45,180,315,90,225];
+
+// One 30-minute session. Order matters: warm the arm, then measure, then train.
+const PLAN = [
+  {kind:"warmup", mode:"sup",   sec:150, scored:false, title:"วอร์ม",
+   say:"ปล่อยแขนให้ลื่นก่อน บล็อกนี้ไม่นับคะแนน"},
+  {kind:"bench",  mode:"lines", strokes:8, scored:true, title:"วัดผล",
+   say:"8 เส้น ความยาวและทิศเดียวกันทุกวัน นี่คือบล็อกเดียวที่เข้ากราฟแนวโน้ม"},
+  {kind:"train",  mode:"lines", sec:810, scored:true, title:"ฝึกเส้น",
+   say:"สุ่มทิศเต็มที่ ระบบจะดันมุมที่คุณลากน้อยมาให้"},
+  {kind:"train",  mode:"plane", sec:540, scored:true, title:"ฝึกเพลน",
+   say:"กรอบ 4 ด้าน ทแยง 2 แล้วผ่ากลาง 2"}
+];
+const PLAN_SEC = PLAN.reduce((a,b)=>a+(b.sec||90),0);
+
+const MODES = {
+  sup:   {name:"Superimposed", short:"ทับเส้น", sub:"ทับเส้นเดิม 8 รอบ ล็อกจุดเริ่ม", sets:5,  per:8},
+  lines: {name:"Ghosted lines", short:"เส้น", sub:"จุดต่อจุด สุ่มทิศให้ครบทุกมุม", sets:20, per:1},
+  plane: {name:"Ghosted planes", short:"เพลน", sub:"กรอบ ทแยง แล้วผ่ากลาง", sets:3,  per:8}
+};
+
+// direction-balanced angle picker: favours under-practised bins
+function pickAngle(history){
+  const BINS = 12, counts = new Array(BINS).fill(0);
+  history.slice(-90).forEach(a => counts[Math.floor(((a%360)+360)%360/(360/BINS))%BINS]++);
+  const min = Math.min.apply(null, counts);
+  const pool = [];
+  counts.forEach((c,i)=>{ if (c <= min+1) pool.push(i); });
+  const bin = pool[Math.floor(Math.random()*pool.length)];
+  return (bin+Math.random())*(360/BINS);
+}
+
+function genLine(w,h,history){
+  const pad = 26, maxR = Math.min(w,h)*0.90;
+  for(let tries=0;tries<60;tries++){
+    const ang = pickAngle(history)*Math.PI/180;
+    const len = maxR*(0.32+Math.random()*0.62);
+    const cx = pad+Math.random()*(w-2*pad), cy = pad+Math.random()*(h-2*pad);
+    const A = {x:cx-Math.cos(ang)*len/2, y:cy-Math.sin(ang)*len/2};
+    const B = {x:cx+Math.cos(ang)*len/2, y:cy+Math.sin(ang)*len/2};
+    if (A.x>pad&&A.x<w-pad&&A.y>pad&&A.y<h-pad&&B.x>pad&&B.x<w-pad&&B.y>pad&&B.y<h-pad)
+      return {dots:[A,B], pairs:[[0,1]]};
+  }
+  return {dots:[{x:pad,y:h/2},{x:w-pad,y:h/2}], pairs:[[0,1]]};
+}
+
+function genPlane(w,h){
+  const pad = 30;
+  const budget = Math.min(w,h)/2 - pad;          // furthest a corner may sit from centre
+  const off = budget*0.22;
+  const cx = w/2+(Math.random()-.5)*2*off, cy = h/2+(Math.random()-.5)*2*off;
+  const R = (budget-off)*(0.68+Math.random()*0.26);
+  const base = Math.random()*Math.PI*2, dots=[];
+  for(let i=0;i<4;i++){
+    const a = base + i*Math.PI/2 + (Math.random()-.5)*0.42;
+    const r = R*(0.82+Math.random()*0.36);
+    dots.push({x: cx+Math.cos(a)*r, y: cy+Math.sin(a)*r});
+  }
+  const mid=(a,b)=>({x:(a.x+b.x)/2,y:(a.y+b.y)/2});
+  dots.push(mid(dots[0],dots[1]), mid(dots[1],dots[2]), mid(dots[2],dots[3]), mid(dots[3],dots[0]));
+  return {
+    dots,
+    pairs:[[0,1],[1,2],[2,3],[3,0],[0,2],[1,3],[4,6],[5,7]],
+    labels:["ขอบ 1","ขอบ 2","ขอบ 3","ขอบ 4","ทแยง 1","ทแยง 2","ผ่ากลาง 1","ผ่ากลาง 2"]
+  };
+}
+
+// benchmark target: centred, fixed length, fixed direction — never adapts
+function genBench(w,h,k){
+  const pad = 30, a = BENCH_ANGLES[k%8]*Math.PI/180;
+  const ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+  const L = Math.min(BENCH_MM*MM,
+                     ca>1e-3 ? (w-2*pad)/ca : Infinity,
+                     sa>1e-3 ? (h-2*pad)/sa : Infinity);
+  const cx = w/2, cy = h/2;
+  return {
+    dots:[{x:cx-Math.cos(a)*L/2, y:cy-Math.sin(a)*L/2},
+          {x:cx+Math.cos(a)*L/2, y:cy+Math.sin(a)*L/2}],
+    pairs:[[0,1]], benchLen:L
+  };
+}
+
+function genSup(w,h,history){
+  const g = genLine(w,h,history);
+  return {dots:g.dots, pairs:Array.from({length:8},()=>[0,1]), guide:true};
+}
+
+/* =====================================================================
+   4. canvas capture
+   ===================================================================== */
+const pad = document.getElementById("pad");
+const stage = document.getElementById("stage");
+const ctx = pad.getContext("2d", {desynchronized:true, alpha:false});
+let W=0, H=0, DPR=1;
+
+function fit(){
+  DPR = Math.min(window.devicePixelRatio||1, 3);
+  const r = stage.getBoundingClientRect();
+  W = Math.round(r.width); H = Math.round(r.height);
+  pad.width = Math.round(W*DPR); pad.height = Math.round(H*DPR);
+  pad.style.width = W+"px"; pad.style.height = H+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  redraw();
+}
+window.addEventListener("resize", ()=>setTimeout(fit,60));
+window.addEventListener("orientationchange", ()=>setTimeout(fit,220));
+
+const S = {
+  mode:"lines", running:false,
+  target:null, pairIdx:0, setIdx:0, locked:false,
+  timed:false, blockIdx:0, blockStart:0, blockStrokes:0, benchLen:null,
+  sessionStart:0, pausedAt:0, tick:null,
+  strokes:[], done:[],          // done = committed ink for this set
+  live:null, penSeen:false,
+  angles:[], sessions:[]
+};
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function redraw(){
+  ctx.fillStyle = css("--paper");
+  ctx.fillRect(0,0,W,H);
+  if (!S.target) return;
+  const {dots, pairs, guide} = S.target;
+
+  // guide line for superimposed
+  if (guide){
+    ctx.save();
+    ctx.strokeStyle = css("--guide"); ctx.lineWidth = 1.5;
+    ctx.setLineDash([7,5]);
+    ctx.beginPath(); ctx.moveTo(dots[0].x,dots[0].y); ctx.lineTo(dots[1].x,dots[1].y); ctx.stroke();
+    ctx.restore();
+  }
+
+  // committed ink
+  S.done.forEach(st => inkStroke(st.pts, "rgba(32,36,42,.55)"));
+
+  // active target pair, drawn so start and end are never ambiguous
+  if (S.pairIdx < pairs.length){
+    const [i,j] = pairs[S.pairIdx];
+    const A = dots[i], B = dots[j], C = css("--machine");
+    ctx.save();
+    ctx.strokeStyle = C; ctx.lineWidth = 1;
+    ctx.setLineDash([3,6]); ctx.globalAlpha = .34;
+    ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+    ctx.restore();
+    arrowAt(A, B, 0.62, C);
+    markStart(A, C);
+    markEnd(B, C);
+  }
+  // remaining dots
+  dots.forEach((d,k)=>{
+    if (S.pairIdx < pairs.length && pairs[S.pairIdx].includes(k)) return;
+    if (S.mode==="plane" && k>=4) return;
+    dot(d, css("--target"), 3.2);
+  });
+
+  if (S.live) inkStroke(S.live, css("--graphite"));
+}
+function dot(p,color,r){
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x,p.y,r,0,7); ctx.fill();
+}
+// solid disc inside a lock ring — this is where the pen goes down
+function markStart(p,color){
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .45;
+  ctx.beginPath(); ctx.arc(p.x,p.y,11.5,0,7); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x,p.y,6,0,7); ctx.fill();
+}
+// open ring — this is where the pen lifts
+function markEnd(p,color){
+  ctx.strokeStyle = color; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(p.x,p.y,7.5,0,7); ctx.stroke();
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(p.x,p.y,1.6,0,7); ctx.fill();
+}
+function arrowAt(A,B,frac,color){
+  const dx=B.x-A.x, dy=B.y-A.y, L=Math.hypot(dx,dy)||1;
+  const ux=dx/L, uy=dy/L, x=A.x+dx*frac, y=A.y+dy*frac, s=8;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.globalAlpha = .8;
+  ctx.beginPath();
+  ctx.moveTo(x-ux*s-uy*s*0.62, y-uy*s+ux*s*0.62);
+  ctx.lineTo(x, y);
+  ctx.lineTo(x-ux*s+uy*s*0.62, y-uy*s-ux*s*0.62);
+  ctx.stroke();
+  ctx.restore();
+}
+// screen-space compass, y pointing down
+function dirName(A,B){
+  const a = ((Math.atan2(B.y-A.y,B.x-A.x)*180/Math.PI)%360+360)%360;
+  return ["ขวา","ขวาล่าง","ลง","ซ้ายล่าง","ซ้าย","ซ้ายบน","ขึ้น","ขวาบน"][Math.round(a/45)%8];
+}
+function inkStroke(pts, color){
+  if (pts.length<2) return;
+  ctx.strokeStyle = color; ctx.lineCap="round"; ctx.lineJoin="round";
+  for(let i=1;i<pts.length;i++){
+    ctx.lineWidth = 1.5 + (pts[i].p||.5)*2.2;
+    ctx.beginPath(); ctx.moveTo(pts[i-1].x,pts[i-1].y); ctx.lineTo(pts[i].x,pts[i].y); ctx.stroke();
+  }
+}
+function inkSegment(a,b){
+  ctx.strokeStyle = css("--graphite"); ctx.lineCap="round"; ctx.lineJoin="round";
+  ctx.lineWidth = 1.5+(b.p||.5)*2.2;
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+}
+
+let drawing=false, activeId=null;
+function local(e){
+  const r = pad.getBoundingClientRect();
+  return {x:e.clientX-r.left, y:e.clientY-r.top, t:e.timeStamp, p:e.pressure||0.5};
+}
+function accepts(e){
+  if (e.pointerType === "pen"){ S.penSeen = true; return true; }
+  if (e.pointerType === "touch") return !S.penSeen;      // palm rejection once a pen appears
+  return true;                                            // mouse / trackpad for desktop testing
+}
+
+pad.addEventListener("pointerdown", e=>{
+  if (!S.running || S.locked || drawing || !accepts(e)) return;
+  e.preventDefault();
+  drawing = true; activeId = e.pointerId;
+  pad.setPointerCapture(e.pointerId);
+  S.live = [local(e)];
+  hint("");
+}, {passive:false});
+
+pad.addEventListener("pointermove", e=>{
+  if (!drawing || e.pointerId!==activeId) return;
+  e.preventDefault();
+  const batch = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  for (const ev of batch){
+    const p = local(ev);
+    const prev = S.live[S.live.length-1];
+    if (V.dist(p,prev) < 0.35) continue;
+    S.live.push(p); inkSegment(prev,p);
+  }
+}, {passive:false});
+
+function endStroke(e){
+  if (!drawing || e.pointerId!==activeId) return;
+  e.preventDefault();
+  drawing = false; activeId = null;
+  const pts = S.live; S.live = null;
+  commit(pts);
+}
+pad.addEventListener("pointerup", endStroke, {passive:false});
+pad.addEventListener("pointercancel", endStroke, {passive:false});
+
+/* =====================================================================
+   5. session flow
+   ===================================================================== */
+function hint(t){
+  const h = document.getElementById("hint");
+  h.textContent = t; h.style.opacity = t?1:0;
+}
+
+// one line telling the user exactly which mark to make next
+function sayTarget(fresh){
+  const {dots, pairs, labels} = S.target;
+  if (S.pairIdx >= pairs.length) return;
+  const [i,j] = pairs[S.pairIdx];
+  const dir = "ลากไปทาง" + dirName(dots[i], dots[j]);
+  let lead;
+  if (S.mode === "sup") lead = "รอบที่ " + (S.pairIdx+1) + " จาก " + pairs.length;
+  else if (S.mode === "plane") lead = labels[S.pairIdx];
+  else if (S.timed && PLAN[S.blockIdx].kind === "bench")
+    lead = "วัดผล " + (S.blockStrokes+1) + " จาก 8";
+  else lead = "เส้นที่ " + (S.blockStrokes+1);
+  let t = lead + " · " + dir;
+  if (S.strokes.length === 0 && fresh) t += "   (จุดทึบ = เริ่ม, วงแหวน = จบ)";
+  hint(t);
+}
+
+function newTarget(){
+  S.locked = false;
+  S.pairIdx = 0; S.done = [];
+  const blk = S.timed ? PLAN[S.blockIdx] : null;
+  if (blk && blk.kind === "bench"){
+    S.target = genBench(W,H,S.blockStrokes);
+    S.benchLen = S.target.benchLen;
+  }
+  else if (S.mode==="lines") S.target = genLine(W,H,S.angles);
+  else if (S.mode==="plane") S.target = genPlane(W,H);
+  else S.target = genSup(W,H,S.angles);
+  redraw();
+  updateBar();
+  sayTarget(true);
+}
+
+function commit(pts){
+  const {dots, pairs} = S.target;
+  const [i,j] = pairs[S.pairIdx];
+  const m = analyze(pts, dots[i], dots[j]);
+  if (!m){ redraw(); hint("เส้นสั้นเกินไป ลากใหม่"); return; }
+  // drawn from the wrong end: the exercise is the assigned direction, so say so
+  const reversed = V.dist(pts[0],dots[j]) + V.dist(pts[pts.length-1],dots[i])
+                 < V.dist(pts[0],dots[i]) + V.dist(pts[pts.length-1],dots[j]);
+
+  S.done.push({pts});
+  S.blockStrokes++;
+  S.strokes.push({
+    mode:S.mode, set:S.setIdx, idx:S.strokes.length,
+    block: S.timed ? PLAN[S.blockIdx].kind : "single",
+    A:dots[i], B:dots[j], pts, m, reversed,
+    label: (S.target.labels ? S.target.labels[S.pairIdx] : "#"+(S.strokes.length+1))
+           + (reversed ? " ↩" : "")
+  });
+  S.angles.push(m.angle);
+  showLive(m);
+
+  if (reversed) hint("เส้นนี้ลากกลับทาง — ครั้งหน้าเริ่มที่จุดทึบ");
+  S.pairIdx++;
+  if (S.pairIdx >= pairs.length){
+    S.setIdx++;
+    if (S.timed){
+      if (blockComplete()){ nextBlock(); return; }
+    } else if (S.setIdx >= MODES[S.mode].sets){ finish(); return; }
+    S.locked = true;
+    setTimeout(newTarget, 260);
+  } else {
+    redraw(); updateBar(); sayTarget(false);
+  }
+}
+
+function showLive(m){
+  const strip = document.getElementById("strip");
+  strip.classList.remove("empty");
+  const cells = [
+    ["ความตรง", m.straightness.toFixed(2)+"%", grade(m.straightness,BANDS.straightness)],
+    ["โก่ง", (m.bow>=0?"+":"")+m.bow.toFixed(2)+"%", 1-Math.min(1,Math.abs(m.bow)/2)],
+    ["ตะขอ", m.hookEnd.toFixed(1)+"°", grade(Math.abs(m.hookEnd),BANDS.hook)],
+    ["สั่น", String(m.reversals), grade(m.reversals,BANDS.reversals)],
+    ["ยกตอนยังวิ่ง", Math.round(m.liftSpeed*100)+"%", grade(m.liftSpeed,BANDS.lift)]
+  ];
+  strip.innerHTML = cells.map(([k,v,g])=>
+    `<div class="cell"><div class="k">${k}</div><div class="v ${gradeClass(g)}">${v}</div></div>`
+  ).join("");
+}
+
+function fmt(s){
+  s = Math.max(0, Math.round(s));
+  return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0");
+}
+function blockElapsed(){
+  if (!S.blockStart) return 0;
+  return ((S.pausedAt || Date.now()) - S.blockStart)/1000;
+}
+function blockComplete(){
+  const b = PLAN[S.blockIdx];
+  return b.strokes ? S.blockStrokes >= b.strokes : blockElapsed() >= b.sec;
+}
+
+function updateBar(){
+  const c = document.getElementById("counter");
+  if (!S.timed){
+    const M = MODES[S.mode];
+    c.innerHTML = `<b>${S.strokes.length}</b> / ${M.sets*M.per}`;
+    return;
+  }
+  const b = PLAN[S.blockIdx];
+  const left = b.strokes ? (b.strokes - S.blockStrokes) + " เส้น"
+                         : fmt(b.sec - blockElapsed());
+  const total = (Date.now() - S.sessionStart)/1000;
+  c.innerHTML = `<b>${left}</b> <span style="opacity:.55">· รวม ${fmt(total)}</span>`;
+  let done = 0;
+  for (let k=0;k<S.blockIdx;k++) done += PLAN[k].sec || 90;
+  done += b.strokes ? (b.strokes?S.blockStrokes/b.strokes*90:0)
+                    : Math.min(blockElapsed(), b.sec);
+  document.getElementById("prog").style.width =
+    Math.min(100, done/PLAN_SEC*100).toFixed(1) + "%";
+}
+
+function resetStrip(){
+  const s = document.getElementById("strip");
+  s.classList.add("empty");
+  s.innerHTML = ["ความตรง","โก่ง","ตะขอ","สั่น","ยกตอนยังวิ่ง"]
+    .map(k=>`<div class="cell"><div class="k">${k}</div><div class="v">–</div></div>`).join("");
+}
+
+// full-bleed card between blocks. The clock stops while it is up, so reading it
+// never costs practice time.
+function interstitial(title, text, after){
+  S.pausedAt = Date.now();
+  const el = document.getElementById("gate");
+  el.innerHTML = `<div><h3>${title}</h3><p>${text}</p><span>แตะเพื่อเริ่ม</span></div>`;
+  el.hidden = false;
+  let fired = false;
+  const go = () => {
+    if (fired) return; fired = true;
+    clearTimeout(timer);
+    el.hidden = true; el.onclick = null;
+    if (S.pausedAt){ S.blockStart += Date.now() - S.pausedAt; S.pausedAt = 0; }
+    after();
+  };
+  const timer = setTimeout(go, 3200);
+  el.onclick = go;
+}
+
+function nextBlock(){
+  S.locked = true;
+  if (S.blockIdx + 1 >= PLAN.length){ finish(); return; }
+  S.blockIdx++;
+  const b = PLAN[S.blockIdx];
+  S.mode = b.mode; S.blockStrokes = 0; S.setIdx = 0;
+  document.getElementById("blockname").textContent = b.title;
+  interstitial(b.title, b.say, ()=>{
+    S.blockStart = Date.now();
+    resetStrip();
+    newTarget();
+  });
+}
+
+function startTimed(){
+  S.timed = true; S.running = true;
+  S.strokes = []; S.penSeen = false; S.blockIdx = 0; S.blockStrokes = 0;
+  S.setIdx = 0; S.benchLen = null; S.pausedAt = 0;
+  S.angles = S.sessions.flatMap(s=>s.angles||[]).slice(-90);
+  S.mode = PLAN[0].mode;
+  S.sessionStart = Date.now();
+  document.getElementById("home").hidden = true;
+  document.getElementById("modes").hidden = true;
+  document.getElementById("blockname").hidden = false;
+  document.getElementById("blockname").textContent = PLAN[0].title;
+  document.getElementById("progwrap").hidden = false;
+  resetStrip();
+  if (S.tick) clearInterval(S.tick);
+  S.tick = setInterval(()=>{
+    if (!S.running || !S.timed || S.pausedAt || drawing) return;
+    updateBar();
+    if (blockComplete() && !PLAN[S.blockIdx].strokes) nextBlock();
+  }, 1000);
+  requestAnimationFrame(()=>{
+    fit();
+    S.blockStart = Date.now();
+    interstitial(PLAN[0].title, PLAN[0].say, ()=>{ S.blockStart = Date.now(); newTarget(); });
+  });
+}
+
+function start(mode){
+  S.timed = false; S.mode = mode; S.running = true;
+  S.strokes = []; S.setIdx = 0; S.blockStrokes = 0; S.penSeen = false;
+  S.angles = S.sessions.flatMap(s=>s.angles||[]).slice(-90);
+  if (S.tick){ clearInterval(S.tick); S.tick = null; }
+  document.getElementById("home").hidden = true;
+  document.getElementById("modes").hidden = false;
+  document.getElementById("blockname").hidden = true;
+  document.getElementById("progwrap").hidden = true;
+  resetStrip();
+  [...document.querySelectorAll("#modes button")]
+    .forEach(b=>b.classList.toggle("on", b.dataset.m===mode));
+  requestAnimationFrame(()=>{ fit(); newTarget(); });
+}
+
+async function finish(){
+  S.running = false;
+  if (S.tick){ clearInterval(S.tick); S.tick = null; }
+  document.getElementById("gate").hidden = true;
+  const sess = {
+    id: Date.now(), mode: S.mode, at: new Date().toISOString(),
+    timed: S.timed,
+    benchLen: S.timed ? Math.round(S.benchLen||0) : null,
+    durationSec: S.sessionStart ? Math.round((Date.now()-S.sessionStart)/1000) : null,
+    angles: S.strokes.filter(s=>s.block!=="warmup").map(s=>s.m.angle),
+    metrics: S.strokes.map(s=>({
+      block:s.block,
+      straightness:s.m.straightness, bow:s.m.bow, wobbleAmp:s.m.wobbleAmp, bowRatio:s.m.bowRatio,
+      hookEnd:s.m.hookEnd, hookStart:s.m.hookStart, reversals:s.m.reversals,
+      liftSpeed:s.m.liftSpeed, decelOnset:s.m.decelOnset, speedCoV:s.m.speedCoV, sparc:s.m.sparc,
+      startErr:s.m.startErr, endErr:s.m.endErr, overshoot:s.m.overshoot,
+      chord:s.m.chord, angle:s.m.angle, duration:s.m.duration,
+      speedProfile:s.m.speedProfile.map(v=>Math.round(v)),
+      devProfile:s.m.devProfile.map(v=>+v.toFixed(3))
+    }))
+  };
+  S.sessions.unshift(sess);
+  S.sessions = S.sessions.slice(0,120);
+  await Store.save(S.sessions);
+  renderReport(sess, S.strokes);
+}
+
+/* =====================================================================
+   6. charts
+   ===================================================================== */
+function chart(el, h, draw){
+  const c = document.createElement("canvas");
+  const w = el.clientWidth || 320;
+  const dpr = Math.min(window.devicePixelRatio||1,3);
+  c.width = w*dpr; c.height = h*dpr; c.style.height = h+"px";
+  el.appendChild(c);
+  const g = c.getContext("2d");
+  g.setTransform(dpr,0,0,dpr,0,0);
+  draw(g,w,h);
+  return c;
+}
+
+function drawSpeedPlot(g,w,h,profiles){
+  const L=38,R=20,T=10,B=20, pw=w-L-R, ph=h-T-B;
+  const all = profiles.flat().sort((a,b)=>a-b);
+  const max = (all[Math.floor(all.length*0.98)] || 1)*1.10;
+  g.clearRect(0,0,w,h);
+
+  // braking zone 80-100%
+  g.fillStyle="rgba(168,47,27,.10)";
+  g.fillRect(L+pw*0.8, T, pw*0.2, ph);
+
+  g.strokeStyle="#2B3238"; g.lineWidth=1; g.font="10px ui-monospace,monospace";
+  g.fillStyle="#7A837D"; g.textAlign="right";
+  for(let i=0;i<=3;i++){
+    const y = T+ph*i/3;
+    g.beginPath(); g.moveTo(L,y); g.lineTo(L+pw,y); g.stroke();
+    g.fillText(Math.round(max*(1-i/3)), L-6, y+3);
+  }
+  g.textAlign="center";
+  ["0%","50%","100%"].forEach((t,i)=>g.fillText(t, L+pw*i/2, h-5));
+
+  const px=(k,n)=>L+pw*k/(n-1), py=(v)=>T+ph*(1-Math.min(v,max)/max);
+  // individual traces
+  g.strokeStyle="rgba(14,116,144,.22)"; g.lineWidth=1;
+  profiles.forEach(p=>{
+    g.beginPath(); p.forEach((v,k)=>k?g.lineTo(px(k,p.length),py(v)):g.moveTo(px(k,p.length),py(v)));
+    g.stroke();
+  });
+  // median trace
+  const n = profiles[0].length, med=[];
+  for(let k=0;k<n;k++){
+    const col = profiles.map(p=>p[k]).sort((a,b)=>a-b);
+    med.push(col[Math.floor(col.length/2)]);
+  }
+  g.strokeStyle="#3BB6D4"; g.lineWidth=2.2;
+  g.beginPath(); med.forEach((v,k)=>k?g.lineTo(px(k,n),py(v)):g.moveTo(px(k,n),py(v)));
+  g.stroke();
+}
+
+function drawRose(g,w,h,angles){
+  const cx=w/2, cy=h/2, R=Math.min(w,h)/2-16;
+  const BINS=12, counts=new Array(BINS).fill(0);
+  angles.forEach(a=>counts[Math.floor(((a%360)+360)%360/(360/BINS))%BINS]++);
+  const max=Math.max.apply(null,counts)||1;
+  g.clearRect(0,0,w,h);
+  g.strokeStyle="#2B3238"; g.lineWidth=1;
+  [0.5,1].forEach(f=>{ g.beginPath(); g.arc(cx,cy,R*f,0,7); g.stroke(); });
+  for(let i=0;i<BINS;i++){
+    const a0=(i*30-15)*Math.PI/180, a1=(i*30+15)*Math.PI/180;
+    const r=R*counts[i]/max;
+    if (r<1) continue;
+    const share = counts[i]/angles.length;
+    g.fillStyle = share>0.28 ? "rgba(168,47,27,.55)" : "rgba(14,116,144,.55)";
+    g.beginPath(); g.moveTo(cx,cy); g.arc(cx,cy,r,a0,a1); g.closePath(); g.fill();
+  }
+  g.fillStyle="#7A837D"; g.font="10px ui-monospace,monospace"; g.textAlign="center";
+  g.fillText("→", cx+R+9, cy+3); g.fillText("↓", cx, cy+R+12);
+}
+
+function drawStrokeInspect(g,w,h,st){
+  const m=st.m, pts=st.pts;
+  const xs=pts.map(p=>p.x).concat([st.A.x,st.B.x]), ys=pts.map(p=>p.y).concat([st.A.y,st.B.y]);
+  const minX=Math.min.apply(null,xs), maxX=Math.max.apply(null,xs);
+  const minY=Math.min.apply(null,ys), maxY=Math.max.apply(null,ys);
+  const pad=24;
+  const sc=Math.min((w-pad*2)/Math.max(maxX-minX,1),(h-pad*2)/Math.max(maxY-minY,1));
+  const ox=(w-(maxX-minX)*sc)/2-minX*sc, oy=(h-(maxY-minY)*sc)/2-minY*sc;
+  const T=p=>({x:p.x*sc+ox, y:p.y*sc+oy});
+  g.clearRect(0,0,w,h);
+
+  const A=T(st.A), B=T(st.B), Sp=T(pts[0]), Ep=T(pts[pts.length-1]);
+  // chord of the actual stroke
+  g.strokeStyle="rgba(14,116,144,.85)"; g.lineWidth=1; g.setLineDash([4,4]);
+  g.beginPath(); g.moveTo(Sp.x,Sp.y); g.lineTo(Ep.x,Ep.y); g.stroke(); g.setLineDash([]);
+  // stroke
+  g.strokeStyle="#E4E8E1"; g.lineWidth=2; g.lineCap="round"; g.lineJoin="round";
+  g.beginPath(); pts.forEach((p,i)=>{const q=T(p); i?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y);}); g.stroke();
+  // hook zone
+  const s=arcLengths(pts), path=s[s.length-1];
+  const hk=pts.filter((p,i)=>s[i]>=path*0.88);
+  if (hk.length>1){
+    g.strokeStyle=Math.abs(m.hookEnd)>8?"#EF7256":"#E0AC42"; g.lineWidth=3;
+    g.beginPath(); hk.forEach((p,i)=>{const q=T(p); i?g.lineTo(q.x,q.y):g.moveTo(q.x,q.y);}); g.stroke();
+  }
+  // targets
+  g.fillStyle="#0E7490";
+  [A,B].forEach(p=>{ g.beginPath(); g.arc(p.x,p.y,4.5,0,7); g.fill(); });
+  g.strokeStyle="#0E7490"; g.lineWidth=1;
+  [A,B].forEach(p=>{ g.beginPath(); g.arc(p.x,p.y,10,0,7); g.stroke(); });
+}
+
+function drawTrend(g,w,h,series,band){
+  const L=30,R=8,T=10,B=16, pw=w-L-R, ph=h-T-B;
+  g.clearRect(0,0,w,h);
+  if (series.length<2){ g.fillStyle="#7A837D"; g.font="11px sans-serif"; g.textAlign="center";
+    g.fillText("ต้องฝึกครบ 2 รอบก่อน", w/2, h/2); return; }
+  const max=Math.max(Math.max.apply(null,series), band.bad)*1.1;
+  g.strokeStyle="#2B3238"; g.lineWidth=1;
+  g.beginPath(); g.moveTo(L,T+ph*(1-band.good/max)); g.lineTo(L+pw,T+ph*(1-band.good/max)); g.stroke();
+  g.fillStyle="#7A837D"; g.font="10px ui-monospace,monospace"; g.textAlign="right";
+  g.fillText(band.good, L-5, T+ph*(1-band.good/max)+3);
+  const px=k=>L+pw*k/(series.length-1), py=v=>T+ph*(1-v/max);
+  g.strokeStyle="#3BB6D4"; g.lineWidth=2;
+  g.beginPath(); series.forEach((v,k)=>k?g.lineTo(px(k),py(v)):g.moveTo(px(k),py(v))); g.stroke();
+  g.fillStyle="#3BB6D4";
+  series.forEach((v,k)=>{ g.beginPath(); g.arc(px(k),py(v),2.5,0,7); g.fill(); });
+}
+
+/* =====================================================================
+   7. report
+   ===================================================================== */
+const med = a => { const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+const mean = a => a.reduce((x,y)=>x+y,0)/(a.length||1);
+
+function renderReport(sess, strokes){
+  const ALL = sess.metrics;
+  // warm-up never counts; the benchmark is the controlled measurement and is the
+  // only thing that may drive the headline or the trend
+  const rows  = strokes.map((st,i)=>({st, m:ALL[i]})).filter(x=>x.st.block!=="warmup");
+  const bench = rows.filter(x=>x.st.block==="bench");
+  const train = rows.filter(x=>x.st.block==="train");
+  const warm  = strokes.length - rows.length;
+  const fromBench = bench.length >= 4;
+  const M = (fromBench ? bench : rows).map(x=>x.m);
+  if (!M.length){ document.getElementById("report").hidden = false;
+    document.getElementById("reportBody").innerHTML =
+      '<div class="verdict"><h3>ยังไม่มีเส้นที่นับคะแนน</h3><p>รอบนี้มีแต่เส้นวอร์ม</p></div>'
+      + '<div class="actions"><button class="primary" id="homeBtn">กลับหน้าแรก</button></div>';
+    document.getElementById("homeBtn").onclick = ()=>{
+      document.getElementById("report").hidden = true; goHome(); };
+    return; }
+  const agg = {
+    straightness: med(M.map(m=>m.straightness)),
+    hook: med(M.map(m=>Math.abs(m.hookEnd))),
+    reversals: med(M.map(m=>m.reversals)),
+    decel: med(M.map(m=>m.liftSpeed)),
+    bow: mean(M.map(m=>m.bow)),
+    bowSign: M.filter(m=>m.bow>0).length/M.length,
+    accuracy: med(M.map(m=>m.endErr!=null?m.endErr/m.chord:0)),
+    overshoot: med(M.map(m=>m.overshoot!=null?m.overshoot:0)),
+    sparc: med(M.map(m=>m.sparc).filter(v=>v!=null))
+  };
+  const sameSign = Math.max(agg.bowSign, 1-agg.bowSign);
+
+  const g = {
+    straightness: grade(agg.straightness,BANDS.straightness),
+    hook: grade(agg.hook,BANDS.hook),
+    reversals: grade(agg.reversals,BANDS.reversals),
+    decel: grade(agg.decel,BANDS.lift),
+    accuracy: grade(agg.accuracy,BANDS.accuracy),
+    bow: grade(Math.abs(agg.bow)*(0.6+0.8*sameSign), BANDS.bow)
+  };
+  const confidence = (g.straightness*0.20 + g.bow*0.24 + g.hook*0.20
+                    + g.reversals*0.18 + g.decel*0.18);
+
+  // verdict — name the single worst thing
+  const issues = [
+    {k:"bow", g:g.bow, t:"เส้นโก่งเป็นส่วนโค้ง",
+     d:"กลางเส้นเบนออกจากแนวตรง "+Math.abs(agg.bow).toFixed(2)+"% ของความยาว และ "
+       +Math.round(sameSign*100)+"% ของเส้นโก่งไปทางเดียวกัน "
+       +(sameSign>0.75 ? "ทิศเดียวกันขนาดนี้คือลายเซ็นของการหมุนจากข้อศอก ไม่ใช่ไหล่"
+                       : "ทิศยังสลับกันอยู่ แปลว่าเป็นการเลี้ยงเส้นมากกว่าท่าแขน")},
+    {k:"straightness", g:g.straightness, t:"เส้นยังเบี้ยวจากแนวตรงมาก",
+     d:"ค่ากลางอยู่ที่ "+agg.straightness.toFixed(2)+"% ของความยาวเส้น เกณฑ์ดีคือต่ำกว่า 0.8%"},
+    {k:"decel", g:g.decel, t:"เบรกก่อนถึงจุดปลาย",
+     d:"ตอนยกปากกาเหลือความเร็วแค่ "+Math.round(agg.decel*100)+"% ของ peak แปลว่าหยุดก่อนแล้วค่อยยก นี่คือต้นเหตุของตะขอ"},
+    {k:"hook", g:g.hook, t:"ปลายเส้นงอเป็นตะขอ",
+     d:"ค่ากลาง "+agg.hook.toFixed(1)+"° เกิดตอนไหล่หยุดแล้วข้อมือลากต่อ"},
+    {k:"reversals", g:g.reversals, t:"เส้นสั่น แก้ทางกลางคัน",
+     d:"เปลี่ยนทิศเฉลี่ย "+agg.reversals+" ครั้งต่อเส้น แปลว่าลากช้าเกินไปแล้วพยายามเลี้ยงเส้น"}
+  ].sort((a,b)=>a.g-b.g);
+  // a wobbling line makes the terminal tangent meaningless, so wobble outranks hook
+  if (g.reversals < 0.34 && issues[0].k === "hook"){
+    const i = issues.findIndex(x=>x.k==="reversals");
+    if (i > 0) issues.unshift(issues.splice(i,1)[0]);
+  }
+  const worst = issues[0];
+
+  let vClass="", vTitle, vText;
+  if (confidence>=0.75 && worst.g>=0.60){
+    vClass="good"; vTitle="รอบนี้ผ่าน";
+    vText="เส้นมั่นใจและควบคุมได้ ไปต่อได้เลย ที่เหลือให้เก็บคือ"+worst.t.replace(/^เส้น/,"");
+  } else {
+    vClass = confidence<0.42 ? "bad" : "";
+    vTitle = worst.t; vText = worst.d;
+    const second = issues[1];
+    if (second && second.g < 0.4) vText += " รองลงมาคือ"+second.t.replace(/^เส้น/,"");
+  }
+
+  const body = document.getElementById("reportBody");
+  document.getElementById("reportTitle").textContent = sess.timed
+    ? "รอบ 30 นาที · " + fmt(sess.durationSec||0) + " · " + rows.length + " เส้น"
+    : MODES[sess.mode].name + " · " + M.length + " เส้น";
+
+  body.innerHTML = `
+    <div class="verdict ${vClass}"><h3>${vTitle}</h3><p>${vText}</p></div>
+
+    <p class="srcnote">${fromBench
+      ? "ตัวเลขด้านล่างมาจากบล็อกวัดผล 8 เส้น ความยาว "+Math.round((sess.benchLen||0)/MM)+" มม. สเปคเดียวกันทุกรอบ"
+      : "รอบนี้ไม่มีบล็อกวัดผล ตัวเลขมาจากทุกเส้นที่นับคะแนน จึงเทียบข้ามวันไม่ได้"}${
+      warm ? " · ไม่รวมเส้นวอร์ม "+warm+" เส้น" : ""}</p>
+
+    <div class="gauges">
+      ${gaugeRow("ความมั่นใจ","ตัวเลขหลักของรอบนี้", confidence, (confidence*100).toFixed(0))}
+      ${gaugeRow("ความตรง","เบนสูงสุด ÷ ความยาว", g.straightness, agg.straightness.toFixed(2)+"%")}
+      ${gaugeRow("การโก่ง","ส่วนโค้งกลางเส้น · "+Math.round(sameSign*100)+"% ทางเดียวกัน", g.bow, (agg.bow>=0?"+":"")+agg.bow.toFixed(2)+"%")}
+      ${gaugeRow("ตะขอปลาย","มุมของ 12% สุดท้าย", g.hook, agg.hook.toFixed(1)+"°")}
+      ${gaugeRow("การสั่น","ครั้งที่เปลี่ยนทิศ", g.reversals, agg.reversals)}
+      ${gaugeRow("ยกปากกา","ความเร็วเหลือตอนยก ÷ peak", g.decel, Math.round(agg.decel*100)+"%")}
+      ${gaugeRow("ความแม่น","พลาดจุดหมาย · ยังไม่ใช่เป้าหลัก", g.accuracy, (agg.accuracy*100).toFixed(1)+"%")}
+    </div>
+
+    ${sess.timed ? `<div class="volume">
+      <div><span>วอร์ม</span><b>${warm}</b></div>
+      <div><span>วัดผล</span><b>${bench.length}</b></div>
+      <div><span>ฝึก</span><b>${train.length}</b></div>
+      <div><span>รวมเวลา</span><b>${fmt(sess.durationSec||0)}</b></div>
+    </div>` : ""}
+
+    <h4 class="plot-t">ความเร็วตลอดเส้น</h4>
+    <p class="plot-d">เส้นจางคือแต่ละเส้นที่ลาก เส้นเข้มคือค่ากลาง แถบแดงคือ 20% สุดท้าย
+      ถ้ากราฟดิ่งชนพื้นก่อนสุดขอบขวา แปลว่าคุณหยุดก่อนแล้วค่อยยกปากกา นั่นคือที่มาของตะขอ เส้นที่ดีจะยังสูงอยู่ตอนจบ</p>
+    <div class="plotbox" id="plotSpeed"></div>
+
+    <div class="twocol">
+      <div>
+        <h4 class="plot-t">ทิศทางที่ลาก</h4>
+        <p class="plot-d">แดง = ทิศที่ลากซ้ำเกิน 28% ของทั้งหมด</p>
+        <div class="plotbox" id="plotRose"></div>
+      </div>
+      <div>
+        <h4 class="plot-t">แนวโน้มความตรง</h4>
+        <p class="plot-d">ค่ากลางของบล็อกวัดผล เก่า → ใหม่</p>
+        <div class="plotbox" id="plotTrend"></div>
+      </div>
+    </div>
+
+    <h4 class="plot-t">รายเส้น</h4>
+    <p class="plot-d">แตะเพื่อดูเส้นนั้นขยาย พร้อมกราฟความเร็วของมัน · ◆ คือเส้นในบล็อกวัดผล</p>
+    <table class="strokes"><thead><tr>
+      <th>เส้น</th><th>ตรง</th><th>โก่ง</th><th>ตะขอ</th><th>สั่น</th><th>ยกที่ %peak</th>
+    </tr></thead><tbody id="strokeRows"></tbody></table>
+
+    ${sess.timed ? `<div class="stop">
+      <h4>จบรอบแล้ว</h4>
+      <p>พอสำหรับวันนี้ ที่เหลือของเวลาวาดให้เอาไปวาดอะไรก็ได้ที่อยากวาด
+         ดริลล์ล้วนติดกันหลายสัปดาห์คือทางที่คนเลิกกลางคันมากที่สุด</p>
+    </div>
+    <div class="actions"><button class="primary" id="homeBtn">เสร็จแล้ว</button></div>`
+    : `<div class="actions">
+      <button class="primary" id="againBtn">ฝึกต่ออีกรอบ</button>
+      <button id="homeBtn">กลับหน้าแรก</button>
+    </div>`}`;
+
+  const speeds = rows.map(x=>x.m.speedProfile);
+  chart(document.getElementById("plotSpeed"), 190, (g2,w,h)=>drawSpeedPlot(g2,w,h,speeds));
+  chart(document.getElementById("plotRose"), 170, (g2,w,h)=>drawRose(g2,w,h,sess.angles));
+  // only sessions that ran the fixed benchmark, and only at the same line length
+  const trend = S.sessions
+    .filter(s=>s.benchLen && Math.abs(s.benchLen-(sess.benchLen||0))<12)
+    .slice(0,12).reverse()
+    .map(s=>med(s.metrics.filter(m=>m.block==="bench").map(m=>m.straightness)))
+    .filter(v=>v!=null && isFinite(v));
+  chart(document.getElementById("plotTrend"), 170, (g2,w,h)=>drawTrend(g2,w,h,trend,BANDS.straightness));
+
+  const tb = document.getElementById("strokeRows");
+  tb.innerHTML = rows.map(({st,m},i)=>{
+    const cell=(v,gd)=>`<td class="${gd<0.33?"flag":gd>0.66?"fine":""}">${v}</td>`;
+    return `<tr data-i="${i}">
+      <td${st.reversed?' class="flag"':""}>${st.block==="bench"?"◆ ":""}${st.label}</td>
+      ${cell(m.straightness.toFixed(2), grade(m.straightness,BANDS.straightness))}
+      ${cell((m.bow>=0?"+":"")+m.bow.toFixed(2), 1-Math.min(1,Math.abs(m.bow)/2))}
+      ${cell(m.hookEnd.toFixed(1), grade(Math.abs(m.hookEnd),BANDS.hook))}
+      ${cell(m.reversals, grade(m.reversals,BANDS.reversals))}
+      ${cell(Math.round(m.liftSpeed*100), grade(m.liftSpeed,BANDS.lift))}
+    </tr>`;
+  }).join("");
+  tb.querySelectorAll("tr").forEach(tr=>{
+    const r = rows[+tr.dataset.i];
+    tr.addEventListener("click",()=>inspectStroke(r.st, +tr.dataset.i));
+  });
+
+  const again = document.getElementById("againBtn");
+  if (again) again.onclick = ()=>{
+    document.getElementById("report").hidden = true; start(sess.mode);
+  };
+  document.getElementById("homeBtn").onclick = ()=>{
+    document.getElementById("report").hidden = true; goHome();
+  };
+  document.getElementById("report").hidden = false;
+  document.getElementById("report").querySelector(".body").scrollTop = 0;
+}
+
+function gaugeRow(label, sub, gval, num){
+  return `<div class="g">
+    <div class="lab">${label}<em>${sub}</em></div>
+    <div class="track"><div class="fill" style="width:${Math.round(gval*100)}%;background:${gradeColor(gval)}"></div></div>
+    <div class="num" style="color:${gradeColor(gval)}">${num}</div>
+  </div>`;
+}
+
+function inspectStroke(st, i){
+  const m = st.m;
+  document.getElementById("inspectTitle").textContent = st.label || ("เส้นที่ "+(i+1));
+  const b = document.getElementById("inspectBody");
+  b.innerHTML = `
+    <div class="plotbox" id="ins1"></div>
+    <div class="readout">
+      ${ro("ความตรง", m.straightness.toFixed(2)+"%")}
+      ${ro("โก่ง", (m.bow>=0?"+":"")+m.bow.toFixed(2)+"%")}
+      ${ro("รูปทรง", m.bowRatio>0.6?"โค้งทางเดียว":"สั่น/หักไปมา")}
+      ${ro("ตะขอปลาย", m.hookEnd.toFixed(1)+"°")}
+      ${ro("ตะขอต้น", m.hookStart.toFixed(1)+"°")}
+      ${ro("เปลี่ยนทิศ", m.reversals+" ครั้ง")}
+      ${ro("ทิศที่สั่ง", dirName(st.A, st.B) + (st.reversed?" (ลากกลับ)":""))}
+      ${ro("พลาดจุดเริ่ม", Math.round(m.startErr)+" px")}
+      ${ro("พลาดจุดจบ", Math.round(m.endErr)+" px")}
+      ${ro("เลยเป้า", (m.overshoot>=0?"+":"")+Math.round(m.overshoot)+" px")}
+      ${ro("ยกที่ % ของ peak", Math.round(m.liftSpeed*100)+"%")}
+      ${ro("เริ่มช้าลงที่", Math.round(m.decelOnset*100)+"%")}
+      ${ro("SPARC", m.sparc!=null?m.sparc.toFixed(2):"–")}
+    </div>
+    <h4 class="plot-t">ความเร็วของเส้นนี้</h4>
+    <p class="plot-d">แกนนอนคือตำแหน่งตามความยาวเส้น 0 ถึง 100%</p>
+    <div class="plotbox" id="ins2"></div>`;
+  chart(document.getElementById("ins1"), 260, (g,w,h)=>drawStrokeInspect(g,w,h,st));
+  chart(document.getElementById("ins2"), 160, (g,w,h)=>drawSpeedPlot(g,w,h,[m.speedProfile]));
+  document.getElementById("inspect").hidden = false;
+  b.scrollTop = 0;
+}
+function ro(k,v){ return `<div><span>${k}</span><b>${v}</b></div>`; }
+
+/* =====================================================================
+   8. home + wiring
+   ===================================================================== */
+const GLYPH = {
+  sup:`<svg class="glyph" viewBox="0 0 46 38"><g stroke="#3BB6D4" fill="none" stroke-width="1.3" stroke-linecap="round">
+    <path d="M7 19 L39 15"/><path d="M7 19 L39 19"/><path d="M7 19 L39 23"/><path d="M7 19 L39 17"/></g>
+    <circle cx="7" cy="19" r="2.4" fill="#3BB6D4"/></svg>`,
+  lines:`<svg class="glyph" viewBox="0 0 46 38"><g stroke="#3BB6D4" fill="none" stroke-width="1.3" stroke-linecap="round">
+    <path d="M8 28 L38 11"/></g><circle cx="8" cy="28" r="2.4" fill="#3BB6D4"/><circle cx="38" cy="11" r="2.4" fill="#3BB6D4"/></svg>`,
+  plane:`<svg class="glyph" viewBox="0 0 46 38"><g stroke="#3BB6D4" fill="none" stroke-width="1.2" stroke-linecap="round">
+    <path d="M9 9 L37 12 L35 29 L11 27 Z"/><path d="M9 9 L35 29"/><path d="M37 12 L11 27"/></g></svg>`
+};
+
+function goHome(){
+  S.running = false; S.timed = false;
+  if (S.tick){ clearInterval(S.tick); S.tick = null; }
+  document.getElementById("gate").hidden = true;
+  document.getElementById("modes").hidden = false;
+  document.getElementById("blockname").hidden = true;
+  document.getElementById("progwrap").hidden = true;
+  document.getElementById("home").hidden = false;
+  renderHistory();
+}
+
+function renderHistory(){
+  const el = document.getElementById("hist");
+  if (!S.sessions.length){
+    el.innerHTML = `<div class="empty-note">ยังไม่มีข้อมูล เลือกท่าด้านบนเพื่อเริ่มรอบแรก</div>`;
+    return;
+  }
+  el.innerHTML = S.sessions.slice(0,12).map(s=>{
+    const b = s.metrics.filter(m=>m.block==="bench");
+    const use = b.length>=4 ? b : s.metrics.filter(m=>m.block!=="warmup");
+    if (!use.length) return "";
+    const st = med(use.map(m=>m.straightness));
+    const hk = med(use.map(m=>Math.abs(m.hookEnd)));
+    const dc = med(use.map(m=>m.liftSpeed));
+    const d = new Date(s.at);
+    const g1 = grade(st,BANDS.straightness);
+    return `<div class="row">
+      <div class="d">${d.getDate()}/${d.getMonth()+1} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")} · ${s.timed?"30 นาที"+(b.length>=4?" ◆":""):MODES[s.mode].name}</div>
+      <div class="m" style="color:${gradeColor(g1)}">${st.toFixed(2)}%</div>
+      <div class="m" style="color:${gradeColor(grade(hk,BANDS.hook))}">${hk.toFixed(1)}°</div>
+      <div class="m" style="color:${gradeColor(grade(dc,BANDS.lift))}">${Math.round(dc*100)}%</div>
+    </div>`;
+  }).join("");
+}
+
+document.getElementById("pick").innerHTML = Object.entries(MODES).map(([k,v])=>
+  `<button data-m="${k}">${GLYPH[k]}<div class="t"><strong>${v.name}</strong><em>${v.sub}</em></div>
+   <div class="n">${v.sets*v.per} เส้น</div></button>`).join("");
+document.querySelectorAll("#pick button").forEach(b=>
+  b.addEventListener("click",()=>start(b.dataset.m)));
+
+document.getElementById("modes").innerHTML = Object.entries(MODES).map(([k,v])=>
+  `<button data-m="${k}">${v.short}</button>`).join("");
+document.querySelectorAll("#modes button").forEach(b=>
+  b.addEventListener("click",()=>start(b.dataset.m)));
+
+document.getElementById("runBtn").onclick = startTimed;
+document.getElementById("quit").onclick = goHome;
+document.getElementById("skip").onclick = ()=>{ if (S.running) newTarget(); };
+document.getElementById("reportBack").onclick = ()=>{
+  document.getElementById("report").hidden = true; goHome();
+};
+document.getElementById("inspectBack").onclick = ()=>{
+  document.getElementById("inspect").hidden = true;
+};
+
+document.getElementById("exportBtn").onclick = ()=>{
+  const blob = new Blob([JSON.stringify({app:"linelab",v:1,sessions:S.sessions},null,1)],
+    {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "linelab-"+new Date().toISOString().slice(0,10)+".json";
+  a.click();
+};
+document.getElementById("importBtn").onclick = ()=>document.getElementById("importFile").click();
+document.getElementById("importFile").onchange = async (e)=>{
+  const f = e.target.files[0]; if (!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    const incoming = j.sessions||[];
+    const seen = new Set(S.sessions.map(s=>s.id));
+    S.sessions = [...S.sessions, ...incoming.filter(s=>!seen.has(s.id))]
+      .sort((a,b)=>b.id-a.id).slice(0,120);
+    await Store.save(S.sessions); renderHistory();
+  }catch(err){ alert("ไฟล์อ่านไม่ได้: "+err.message); }
+};
+
+(async function boot(){
+  await Store.detect();
+  const lbl = {synced:"บันทึกถาวร", local:"บันทึกในเครื่อง", memory:"ไม่บันทึก — export ก่อนปิด"};
+  document.getElementById("storemode").textContent = lbl[Store.label()];
+  S.sessions = await Store.load();
+  fit();
+  goHome();
+})();
+</script>
+</body>
+</html>
